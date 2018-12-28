@@ -1,5 +1,4 @@
-from flask import Flask, render_template
-import tensorflow as tf
+from flask import Flask, render_template, request
 
 app = Flask(__name__)
 
@@ -25,7 +24,19 @@ def overview():
     par = "This is some random text that doesn't have HTML formatting"
     return render_template('overview.html', title="OxyKodit overview", body=par)
 
+
 @app.route('/tufa/', defaults={'count': 5})
 @app.route('/tufa/<int:count>')
 def tufa(count):
     return render_template('tufa_img.html', title="Tufa image", border_color="green", count=count)
+
+
+@app.route('/grid/', methods = ['GET', 'POST'])
+def grid():
+    if request.method == 'GET':
+        return render_template('tufa_grid.html', title="Tufa image grid", border_color="green")
+    if request.method == 'POST':
+        color = request.form.get('color')
+        return render_template('tufa_grid.html', title="Tufa image grid", border_color=color)
+
+
