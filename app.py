@@ -25,7 +25,7 @@ def overview():
     par = "This is some random text that doesn't have HTML formatting"
     return render_template('overview.html', title="OxyKodit overview", body=par)
 
-
 @app.route('/tufa/', defaults={'count': 5})
+@app.route('/tufa/<int:count>')
 def tufa(count):
     return render_template('tufa_img.html', title="Tufa image", border_color="green", count=count)
