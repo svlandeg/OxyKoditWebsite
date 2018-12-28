@@ -6,8 +6,8 @@
     </head>
 
     <body>
-        <a href="{{ url_for('overview') }}">
-        <img src="{{ url_for('static', filename='tufa2.jpg') }}" alt="Tufa2" style="width:70px; height:70px; border:5px solid {{ border_color }}">
+        <a href="{{ url_for('tufa', count=8) }}">
+        <img src="{{ url_for('static', filename='tufa2.jpg') }}" alt="Tufa2" style="width:70px; height:70px; border:{{ count }}px solid {{ border_color }}">
         </a>
     </body>
 </html>

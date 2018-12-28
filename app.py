@@ -26,6 +26,6 @@ def overview():
     return render_template('overview.html', title="OxyKodit overview", body=par)
 
 
-@app.route('/tufa/')
-def tufa():
-    return render_template('tufa_img.html', title="Tufa image", border_color="green")
+@app.route('/tufa/', defaults={'count': 5})
+def tufa(count):
+    return render_template('tufa_img.html', title="Tufa image", border_color="green", count=count)
