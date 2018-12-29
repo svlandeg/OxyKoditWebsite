@@ -60,6 +60,14 @@ def _get_color(color_index):
 @app.route('/train/')
 def train():
     par = "Currently training the model"
-    subprocess.call(['python', 'retrain_single.py', '--image_dir=data/tufa_limited_training', '--summaries_dir=/tmp/retrain_tufa', '--testing_percentage=0', '--validation_percentage=0', '--validation_batch_size=0', '--how_many_training_steps=25', '--tfhub_module=https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'])
+    subprocess.call(['python', 'retrain_single.py', '--image_dir=data/tufa_limited_training',
+                     '--testing_percentage=0', '--validation_percentage=0',
+                     '--validation_batch_size=0', '--how_many_training_steps=25',
+                     '--tfhub_module=https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2',
+                     '--output_graph=tmp-train/output_graph.pb',
+                     '--intermediate_output_graphs_dir=tmp-train/intermediate_graph/',
+                     '--output_labels=tmp-train/output_labels.txt',
+                     '--summaries_dir=tmp-train/retrain_tufa',
+                     '--bottleneck_dir=tmp-train/bottleneck'])
 
     return render_template('basic.html', title="Tufa training !", body=par)
