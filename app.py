@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request
 
+import subprocess
+
 app = Flask(__name__)
 
 
@@ -17,7 +19,7 @@ def add(id1, id2):
 @app.route('/overview/')
 def overview():
     par = "This is some random text that doesn't have HTML formatting"
-    return render_template('overview.html', title="OxyKodit overview", body=par)
+    return render_template('basic.html', title="OxyKodit overview", body=par)
 
 
 @app.route('/tufa/', defaults={'count': 5})
@@ -41,9 +43,11 @@ def grid():
         color_list[index_clicked] = str((int(color_list[index_clicked]) + 1) % 3)
         border_colors = ",".join(color_list)
 
-    return render_template('tufa_grid.html', title="Tufa image grid", border_colors=border_colors, border_color_0=get_color(color_list[0]), border_color_1=get_color(color_list[1]), border_color_2=get_color(color_list[2]))
+    # TODO: pass arguments as dict for n images
+    return render_template('tufa_grid.html', title="Tufa image grid", border_colors=border_colors, border_color_0=_get_color(color_list[0]), border_color_1=_get_color(color_list[1]), border_color_2=_get_color(color_list[2]))
 
-def get_color(color_index):
+
+def _get_color(color_index):
     if color_index == "0":
         return "blue"
     if color_index == "1":
@@ -51,3 +55,11 @@ def get_color(color_index):
     if color_index == "2":
         return "red"
     return "black"
+
+
+@app.route('/train/')
+def train():
+    par = "Currently training the model"
+    subprocess.call(['python', 'retrain_single.py', '--image_dir=data/tufa_limited_training', '--summaries_dir=/tmp/retrain_tufa', '--testing_percentage=0', '--validation_percentage=0', '--validation_batch_size=0', '--how_many_training_steps=25', '--tfhub_module=https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'])
+
+    return render_template('basic.html', title="Tufa training !", body=par)
