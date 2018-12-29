@@ -57,6 +57,12 @@ def _get_color(color_index):
     return "black"
 
 
+tmp_dir = "tmp-train/"
+graph = "output_graph.pb"
+labels = "output_labels.txt"
+size = 224
+
+
 @app.route('/train/')
 def train():
     par = "Currently training the model"
@@ -64,10 +70,21 @@ def train():
                      '--testing_percentage=0', '--validation_percentage=0',
                      '--validation_batch_size=0', '--how_many_training_steps=25',
                      '--tfhub_module=https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2',
-                     '--output_graph=tmp-train/output_graph.pb',
-                     '--intermediate_output_graphs_dir=tmp-train/intermediate_graph/',
-                     '--output_labels=tmp-train/output_labels.txt',
-                     '--summaries_dir=tmp-train/retrain_tufa',
-                     '--bottleneck_dir=tmp-train/bottleneck'])
+                     '--output_graph=' + tmp_dir + graph,
+                     '--intermediate_output_graphs_dir=' + tmp_dir + 'intermediate_graph/',
+                     '--output_labels=' + tmp_dir + labels,
+                     '--summaries_dir=' + tmp_dir + 'retrain_tufa',
+                     '--bottleneck_dir=' + tmp_dir + 'bottleneck'])
 
     return render_template('basic.html', title="Tufa training !", body=par)
+
+
+@app.route('/predict/')
+def predict():
+    par = "Currently making predictions with the trained model"
+    subprocess.call(['python', 'label_image_dir.py', '--graph=' + tmp_dir + graph, '--labels=' + tmp_dir + labels,
+                     '--input_layer=Placeholder', '--output_layer=final_result',
+                     '--input_height=' + str(size), '--input_width=' + str(size),
+                     '--dir=static/', '--output_file=static/predictions.csv'])
+
+    return render_template('basic.html', title="Tufa prediction !", body=par)

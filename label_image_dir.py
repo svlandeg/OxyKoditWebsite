@@ -80,6 +80,7 @@ if __name__ == "__main__":
     dir_name = "tensorflow/examples/label_image/data/grace_hopper.jpg"
     model_file = \
         "tensorflow/examples/label_image/data/inception_v3_2016_08_28_frozen.pb"
+    output_file = '/tmp/output.txt'
     label_file = "tensorflow/examples/label_image/data/imagenet_slim_labels.txt"
     input_height = 299
     input_width = 299
@@ -90,6 +91,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", help="image directory to be processed")
+    parser.add_argument("--output_file", help="output file with predictions")
     parser.add_argument("--graph", help="graph/model to be executed")
     parser.add_argument("--labels", help="name of file containing labels")
     parser.add_argument("--input_height", type=int, help="input height")
@@ -102,6 +104,8 @@ if __name__ == "__main__":
 
     if args.graph:
         model_file = args.graph
+    if args.output_file:
+        output_file = args.output_file
     if args.dir:
         dir_name = args.dir
     if args.labels:
@@ -125,9 +129,10 @@ if __name__ == "__main__":
     input_operation = graph.get_operation_by_name(input_name)
     output_operation = graph.get_operation_by_name(output_name)
 
+    output = open(output_file, "w")
+
     for file_name in os.listdir(dir_name):
         if file_name.lower().endswith(".jpg"):
-            print(file_name)
             t = read_tensor_from_image_file(
                 os.path.join(dir_name, file_name),
                 input_height=input_height,
@@ -143,6 +148,9 @@ if __name__ == "__main__":
 
             top_k = results.argsort()[-5:][::-1]
             labels = load_labels(label_file)
+
             for i in top_k:
-                print(" ", labels[i], results[i])
-            print()
+                if labels[i] == "tufa":
+                    output.write(file_name + ';' + str(results[i]) + "\n")
+
+    output.close()
