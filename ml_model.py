@@ -1,3 +1,7 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 # This work was derived from tensorflow/examples/image_retraining (TensorFlow Authors)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,19 +15,9 @@
 # ==============================================================================
 
 from collections import OrderedDict
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import argparse
-import collections
 from datetime import datetime
-import hashlib
 import os.path
 import random
-import re
-import sys
 
 import numpy as np
 import tensorflow as tf
@@ -31,18 +25,18 @@ import tensorflow_hub as hub
 
 # hard-coded FLAGS settings
 FLAGS = dict()
-FLAGS.tfhub_module = "https://tfhub.dev/google/imagenet/inception_v3/feature_vector/"
-FLAGS.final_tensor_name = 'final_result'
-FLAGS.how_many_training_steps = 25
-FLAGS.learning_rate = 0.01
-FLAGS.eval_step_interval = 10
-FLAGS.train_batch_size = 100
+FLAGS['tfhub_module'] = 'https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'
+FLAGS['final_tensor_name'] = 'final_result'
+FLAGS['how_many_training_steps'] = 12
+FLAGS['learning_rate'] = 0.01
+FLAGS['eval_step_interval'] = 10
+FLAGS['train_batch_size'] = 100
 
 # distortions: lets not do them for now
-FLAGS.flip_left_right = False
-FLAGS.random_crop = False
-FLAGS.random_scale = False
-FLAGS.random_brightness = False
+FLAGS['flip_left_right'] = False
+FLAGS['random_crop'] = False
+FLAGS['random_scale'] = False
+FLAGS['random_brightness'] = False
 
 # A module is understood as instrumented for quantization with TF-Lite
 # if it contains any of these ops.
@@ -50,6 +44,8 @@ FAKE_QUANT_OPS = ('FakeQuantWithMinMaxVars',
                   'FakeQuantWithMinMaxVarsPerChannel')
 
 MAX_NUM_IMAGES_PER_CLASS = 2 ** 27 - 1  # ~134M
+
+CHECKPOINT_NAME = 'mytmp/_retrain_checkpoint'
 
 
 def get_image_path(image_lists, label_name, index, category):
@@ -82,6 +78,7 @@ def get_image_path(image_lists, label_name, index, category):
     full_path = os.path.join(sub_dir, base_name)
     return full_path
 
+
 def create_module_graph(module_spec):
     """Creates a graph and loads Hub Module into it.
 
@@ -102,6 +99,31 @@ def create_module_graph(module_spec):
         bottleneck_tensor = m(resized_input_tensor)
         wants_quantization = any(node.op in FAKE_QUANT_OPS for node in graph.as_graph_def().node)
     return graph, bottleneck_tensor, resized_input_tensor, wants_quantization
+
+
+def add_jpeg_decoding(module_spec):
+    """Adds operations that perform JPEG decoding and resizing to the graph..
+
+    Args:
+      module_spec: The hub.ModuleSpec for the image module being used.
+
+    Returns:
+      Tensors for the node to feed JPEG data into, and the output of the
+        preprocessing steps.
+    """
+    input_height, input_width = hub.get_expected_image_size(module_spec)
+    input_depth = hub.get_num_image_channels(module_spec)
+    jpeg_data = tf.placeholder(tf.string, name='DecodeJPGInput')
+    decoded_image = tf.image.decode_jpeg(jpeg_data, channels=input_depth)
+    # Convert from full range of uint8 to range [0,1] of float32.
+    decoded_image_as_float = tf.image.convert_image_dtype(decoded_image,
+                                                          tf.float32)
+    decoded_image_4d = tf.expand_dims(decoded_image_as_float, 0)
+    resize_shape = tf.stack([input_height, input_width])
+    resize_shape_as_int = tf.cast(resize_shape, dtype=tf.int32)
+    resized_image = tf.image.resize_bilinear(decoded_image_4d,
+                                             resize_shape_as_int)
+    return jpeg_data, resized_image
 
 
 def add_final_retrain_ops(class_count, final_tensor_name, bottleneck_tensor, quantize_layer, is_training):
@@ -177,7 +199,7 @@ def add_final_retrain_ops(class_count, final_tensor_name, bottleneck_tensor, qua
     tf.summary.scalar('cross_entropy', cross_entropy_mean)
 
     with tf.name_scope('train'):
-        optimizer = tf.train.GradientDescentOptimizer(FLAGS.learning_rate)
+        optimizer = tf.train.GradientDescentOptimizer(FLAGS['learning_rate'])
         train_step = optimizer.minimize(cross_entropy_mean)
 
     return (train_step, cross_entropy_mean, bottleneck_input, ground_truth_input,
@@ -314,8 +336,6 @@ def get_random_distorted_bottlenecks(
       how_many: The integer number of bottleneck values to return.
       category: Name string of which set of images to fetch - training, testing,
       or validation.
-      image_dir: Root folder string of the subfolders containing the training
-      images.
       input_jpeg_tensor: The input layer we feed the image data to.
       distorted_image: The output node of the distortion graph.
       resized_input_tensor: The input node of the recognition graph.
@@ -377,23 +397,59 @@ def read_tensor_from_image_file(file_name,
     return result
 
 
+def build_eval_session(module_spec, class_count):
+    """Builds an restored eval session without train operations for exporting.
+
+    Args:
+      module_spec: The hub.ModuleSpec for the image module being used.
+      class_count: Number of classes
+
+    Returns:
+      Eval session containing the restored eval graph.
+      The bottleneck input, ground truth, eval step, and prediction tensors.
+    """
+    # If quantized, we need to create the correct eval graph for exporting.
+    eval_graph, bottleneck_tensor, resized_input_tensor, wants_quantization = (
+        create_module_graph(module_spec))
+
+    eval_sess = tf.Session(graph=eval_graph)
+    with eval_graph.as_default():
+        # Add the new layer for exporting.
+        (_, _, bottleneck_input,
+         ground_truth_input, final_tensor) = add_final_retrain_ops(
+            class_count, FLAGS['final_tensor_name'], bottleneck_tensor,
+            wants_quantization, is_training=False)
+
+        # Now we need to restore the values from the training graph to the eval graph.
+        tf.train.Saver().restore(eval_sess, CHECKPOINT_NAME)
+
+        evaluation_step, prediction = add_evaluation_step(final_tensor, ground_truth_input)
+
+    return (eval_sess, resized_input_tensor, bottleneck_input, ground_truth_input,
+            evaluation_step, prediction)
+
+
 def main():
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # create lists of all the images - not working through the actual folder system
     image_lists = OrderedDict([('nontufa', {'dir': 'static', 'training': ['tufa1.jpg', 'tufa2.jpg']}),
                                ('tufa', {'dir': 'static', 'training': ['tufa8.jpg']})])
+
+    # order needs to be the same as in the dict!
+    labels = ['nontufa', 'tufa']
+
     class_count = len(image_lists.keys())
 
     # Set up the pre-trained graph.
-    module_spec = hub.load_module_spec(FLAGS.tfhub_module)
+    module_spec = hub.load_module_spec(FLAGS['tfhub_module'])
     graph, bottleneck_tensor, resized_image_tensor, wants_quantization = (create_module_graph(module_spec))
 
     # Add the new layer that we'll be training.
     with graph.as_default():
         (train_step, cross_entropy, bottleneck_input,
          ground_truth_input, final_tensor) = add_final_retrain_ops(
-            class_count, FLAGS.final_tensor_name, bottleneck_tensor,
+            class_count, FLAGS['final_tensor_name'], bottleneck_tensor,
             wants_quantization, is_training=True)
 
     with tf.Session(graph=graph) as sess:
@@ -402,26 +458,33 @@ def main():
         init = tf.global_variables_initializer()
         sess.run(init)
 
+        # Set up the image decoding sub-graph.
+        jpeg_data_tensor, decoded_image_tensor = add_jpeg_decoding(module_spec)
+
         # We will be applying distortions, so set up the operations we'll need.
         (distorted_jpeg_data_tensor,
          distorted_image_tensor) = add_input_distortions(
-            FLAGS.flip_left_right, FLAGS.random_crop, FLAGS.random_scale,
-            FLAGS.random_brightness, module_spec)
+            FLAGS['flip_left_right'], FLAGS['random_crop'], FLAGS['random_scale'],
+            FLAGS['random_brightness'], module_spec)
 
         # Create the operations we need to evaluate the accuracy of our new layer.
         evaluation_step, _ = add_evaluation_step(final_tensor, ground_truth_input)
 
         merged = tf.summary.merge_all()
 
-        # Run the training for as many cycles as requested on the command line.
-        for i in range(FLAGS.how_many_training_steps):
-            # Get a batch of input bottleneck values, calculated fresh every time with distortions applied
-            (train_bottlenecks,
-             train_ground_truth) = get_random_distorted_bottlenecks(
-                sess, image_lists, FLAGS.train_batch_size, 'training',
-                distorted_jpeg_data_tensor,
-                distorted_image_tensor, resized_image_tensor, bottleneck_tensor)
+        # Create a train saver that is used to restore values into an eval graph
+        # when exporting models.
+        train_saver = tf.train.Saver()
 
+        # Get a batch of input bottleneck values, calculated fresh every time with distortions applied
+        (train_bottlenecks,
+         train_ground_truth) = get_random_distorted_bottlenecks(
+            sess, image_lists, FLAGS['train_batch_size'], 'training',
+            distorted_jpeg_data_tensor,
+            distorted_image_tensor, resized_image_tensor, bottleneck_tensor)
+
+        # Run the training for as many cycles as requested on the command line.
+        for i in range(FLAGS['how_many_training_steps']):
             # Feed the bottlenecks and ground truth into the graph, and run a training
             # step. Capture training summaries for TensorBoard with the `merged` op.
             train_summary, _ = sess.run(
@@ -430,8 +493,8 @@ def main():
                            ground_truth_input: train_ground_truth})
 
             # Every so often, print out how well the graph is training.
-            is_last_step = (i + 1 == FLAGS.how_many_training_steps)
-            if (i % FLAGS.eval_step_interval) == 0 or is_last_step:
+            is_last_step = (i + 1 == FLAGS['how_many_training_steps'])
+            if (i % FLAGS['eval_step_interval']) == 0 or is_last_step:
                 train_accuracy, cross_entropy_value = sess.run(
                     [evaluation_step, cross_entropy],
                     feed_dict={bottleneck_input: train_bottlenecks,
@@ -441,23 +504,31 @@ def main():
                 tf.logging.info('%s: Step %d: Cross entropy = %f' %
                                 (datetime.now(), i, cross_entropy_value))
 
-    # obtain the final graph
-    graph, bottleneck_tensor, resized_input_tensor, wants_quantization = (create_module_graph(module_spec))
-    input_layer = "input"
-    output_layer = "InceptionV3/Predictions/Reshape_1"
-    input_name = "import/" + input_layer
-    output_name = "import/" + output_layer
-    input_operation = graph.get_operation_by_name(input_name)
-    output_operation = graph.get_operation_by_name(output_name)
+        # After training is complete, force one last save of the train checkpoint.
+        train_saver.save(sess, CHECKPOINT_NAME)
 
-    # TODO: do we need to use build_eval_session ?
+        sess, _, _, _, _, _ = build_eval_session(module_spec, class_count)
+        eval_graph = sess.graph
+        output_graph_def = tf.graph_util.convert_variables_to_constants(sess, eval_graph.as_graph_def(), [FLAGS['final_tensor_name']])
 
-    labels = ['tufa', 'nontufa']
-    # predict ]
-    input_height = 299
-    input_width = 299
-    input_mean = 0
-    input_std = 255
+        output_graph = tf.Graph()
+        with output_graph.as_default():
+            tf.import_graph_def(output_graph_def)
+
+        # obtain the final graph
+        # graph, bottleneck_tensor, resized_input_tensor, wants_quantization = (create_module_graph(module_spec))
+        input_layer = "Placeholder"
+        output_layer = "final_result"
+        input_name = "import/" + input_layer
+        output_name = "import/" + output_layer
+        input_operation = output_graph.get_operation_by_name(input_name)
+        output_operation = output_graph.get_operation_by_name(output_name)
+
+        # predict
+        input_height = 224
+        input_width = 224
+        input_mean = 0
+        input_std = 224
 
     for file_name in os.listdir('static'):
         if file_name.lower().endswith(".jpg"):
@@ -468,7 +539,7 @@ def main():
                 input_mean=input_mean,
                 input_std=input_std)
 
-            with tf.Session(graph=graph) as sess:
+            with tf.Session(graph=output_graph) as sess:
                 results = sess.run(output_operation.outputs[0], {
                     input_operation.outputs[0]: t
                 })
@@ -476,6 +547,7 @@ def main():
 
             top_k = results.argsort()[-5:][::-1]
 
+            # we only care about the tufa % prediction
             for i in top_k:
                 if labels[i] == "tufa":
                     print(file_name, str(results[i]))
