@@ -28,7 +28,7 @@ def tufa(count):
     return render_template('tufa_img.html', title="Tufa image", border_color="green", count=count)
 
 
-@app.route('/grid/', methods = ['GET', 'POST'])
+@app.route('/grid/', methods=['GET', 'POST'])
 def grid():
     if request.method == 'GET':
         border_colors="0,0,0"
