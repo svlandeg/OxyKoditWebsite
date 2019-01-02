@@ -17,23 +17,24 @@ def overview():
 
 @app.route('/grid/', methods=['GET', 'POST'])
 def grid():
-    img_nr = 3  # TODO: 42
+    img_nr = 42
 
     if request.method == 'POST':
-        border_colors = request.form.get('border_colors')
-        preds = [0.5, 0.5, 0.5]
+        border_indices = request.form.get('border_indices')
+        preds = [0.5] * img_nr
         index_clicked = int(request.form.get('index_clicked', -1))
         to_retrain = request.form.get('retrain', 'No')
     else:
-        border_colors = "0,0,0"
-        preds = [0.5, 0.5, 0.5]
+        color_list = ["0"] * img_nr
+        border_indices = ",".join(color_list)
+        preds = [0.5] * img_nr
         index_clicked = -1
         to_retrain = "No"
 
-    color_list = border_colors.split(",")
+    color_list = border_indices.split(",")
     if index_clicked > -1:
         color_list[index_clicked] = str((int(color_list[index_clicked]) + 1) % 3)
-        border_colors = ",".join(color_list)
+        border_indices = ",".join(color_list)
 
     if to_retrain == "Yes":
         tufa_image_list = ["img" + str(i) + ".jpg" for i in range(img_nr) if color_list[i] == "1"]
@@ -42,20 +43,12 @@ def grid():
         if (len(tufa_image_list)) > 0 and (len(nontufa_image_list) > 0):
             preds = ml_model.main(tufa_image_list, nontufa_image_list, all_image_list)
 
-    # TODO: pass arguments as dict for n images
     return render_template('tufa_grid.html',
                            title="Tufa image grid",
-                           border_colors=border_colors,
-                           border_color_0=_get_border_color(color_list[0]),
-                           border_color_1=_get_border_color(color_list[1]),
-                           border_color_2=_get_border_color(color_list[2]),
-                           bg_color_0=_get_bg_color(preds[0]),
-                           bg_color_1=_get_bg_color(preds[1]),
-                           bg_color_2=_get_bg_color(preds[2]))
-
-
-def get_pred():
-    return[0, 0.3, 0.9]
+                           border_indices=border_indices,
+                           image_indices=range(img_nr),
+                           border_colors=[_get_border_color(color_list[i]) for i in range(img_nr)],
+                           bg_colors=[_get_bg_color(preds[i]) for i in range(img_nr)])
 
 
 def _get_border_color(color_index):
@@ -64,13 +57,19 @@ def _get_border_color(color_index):
     if color_index == "1":
         return "green"
     if color_index == "2":
-        return "red"
-    return "black"
+        return "black"
+    return "red"
 
 
-def _get_bg_color(color_float):
-    if color_float < 0 or color_float > 1:
-        return "(0, 255, 255)"
-    r = color_float * 255
-    return "(" + str(r) + ",0,0)"
+def _get_bg_color(tufa_pred_float):
+    transparant = 0.5
+
+    tufa_pred_float = max(tufa_pred_float, 0)
+    tufa_pred_float = min(tufa_pred_float, 1)
+
+    # more red if its not a tufa, more green if it's a tufa
+    r = (1-tufa_pred_float)*255
+    g = tufa_pred_float * 255
+
+    return "(" + str(r) + "," + str(g) + ",127.5, " + str(transparant) + ")"
 
