@@ -429,12 +429,12 @@ def build_eval_graph(sess, module_spec, class_count):
     return eval_graph
 
 
-def main():
+def main(tufa_image_list, nontufa_image_list, all_image_list):
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # create lists of all the images - not working through the actual folder system
-    image_lists = OrderedDict([('nontufa', {'dir': 'static', 'training': ['tufa1.jpg', 'tufa2.jpg']}),
-                               ('tufa', {'dir': 'static', 'training': ['tufa8.jpg']})])
+    image_lists = OrderedDict([('nontufa', {'dir': 'static', 'training': nontufa_image_list}),
+                               ('tufa', {'dir': 'static', 'training': tufa_image_list})])
 
     # order needs to be the same as in the dict!
     labels = ['nontufa', 'tufa']
@@ -530,7 +530,8 @@ def main():
         input_mean = 0
         input_std = 224
 
-    for file_name in os.listdir('static'):
+    pred_list = []
+    for file_name in all_image_list:
         if file_name.lower().endswith(".jpg"):
             t = read_tensor_from_image_file(
                 os.path.join('static', file_name),
@@ -550,9 +551,20 @@ def main():
             # we only care about the tufa % prediction
             for i in top_k:
                 if labels[i] == "tufa":
-                    print(file_name, str(results[i]))
+                    # print(file_name, str(results[i]))
+                    pred_list.append(results[i])
+
+    return pred_list
 
 
 if __name__ == '__main__':
-    main()
+    my_tufa_image_list = ['img2.jpg']
+    my_nontufa_image_list = ['img0.jpg', 'img1.jpg']
+    my_all_image_list = []
+    for i in range(42):
+        my_all_image_list.append("img" + str(i) + ".jpg")
+    my_pred_list = main(my_tufa_image_list, my_nontufa_image_list, my_all_image_list)
+
+    for img, pred in zip(my_all_image_list, my_pred_list):
+        print(img, pred)
 

@@ -6,14 +6,8 @@ app = Flask(__name__)
 
 
 @app.route('/')
-def hello_world():
-    return 'Hello from OxyKodit  :)'
-
-
-@app.route('/add/<int:id1>/<int:id2>')
-def add(id1, id2):
-    value = id1+id2
-    return 'Calculated:' + str(value)
+def index():
+    return 'Website under construction !'
 
 
 @app.route('/overview/')
@@ -22,16 +16,10 @@ def overview():
     return render_template('basic.html', title="OxyKodit overview", body=par)
 
 
-@app.route('/tufa/', defaults={'count': 5})
-@app.route('/tufa/<int:count>')
-def tufa(count):
-    return render_template('tufa_img.html', title="Tufa image", border_color="green", count=count)
-
-
 @app.route('/grid/', methods=['GET', 'POST'])
 def grid():
     if request.method == 'GET':
-        border_colors="0,0,0"
+        border_colors = "0,0,0"
         index_clicked = -1
 
     if request.method == 'POST':
@@ -56,35 +44,3 @@ def _get_color(color_index):
         return "red"
     return "black"
 
-
-tmp_dir = "tmp-train/"
-graph = "output_graph.pb"
-labels = "output_labels.txt"
-size = 224
-
-
-@app.route('/train/')
-def train():
-    par = "Currently training the model"
-    subprocess.call(['python', 'retrain_single.py', '--image_dir=data/tufa_limited_training',
-                     '--testing_percentage=0', '--validation_percentage=0',
-                     '--validation_batch_size=0', '--how_many_training_steps=25',
-                     '--tfhub_module=https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2',
-                     '--output_graph=' + tmp_dir + graph,
-                     '--intermediate_output_graphs_dir=' + tmp_dir + 'intermediate_graph/',
-                     '--output_labels=' + tmp_dir + labels,
-                     '--summaries_dir=' + tmp_dir + 'retrain_tufa',
-                     '--bottleneck_dir=' + tmp_dir + 'bottleneck'])
-
-    return render_template('basic.html', title="Tufa training !", body=par)
-
-
-@app.route('/predict/')
-def predict():
-    par = "Currently making predictions with the trained model"
-    subprocess.call(['python', 'label_image_dir.py', '--graph=' + tmp_dir + graph, '--labels=' + tmp_dir + labels,
-                     '--input_layer=Placeholder', '--output_layer=final_result',
-                     '--input_height=' + str(size), '--input_width=' + str(size),
-                     '--dir=static/', '--output_file=static/predictions.csv'])
-
-    return render_template('basic.html', title="Tufa prediction !", body=par)
