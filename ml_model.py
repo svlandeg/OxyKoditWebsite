@@ -45,8 +45,6 @@ FAKE_QUANT_OPS = ('FakeQuantWithMinMaxVars',
 
 MAX_NUM_IMAGES_PER_CLASS = 2 ** 27 - 1  # ~134M
 
-CHECKPOINT_NAME = 'mytmp/_retrain_checkpoint'
-
 
 def get_image_path(image_lists, label_name, index, category):
     """Returns a path to an image for a label at the given index.
@@ -397,36 +395,38 @@ def read_tensor_from_image_file(file_name,
     return result
 
 
-def build_eval_session(module_spec, class_count):
+def build_eval_graph(sess, module_spec, class_count):
     """Builds an restored eval session without train operations for exporting.
 
     Args:
+      sess: Session object
       module_spec: The hub.ModuleSpec for the image module being used.
       class_count: Number of classes
 
     Returns:
-      Eval session containing the restored eval graph.
+      The eval graph.
       The bottleneck input, ground truth, eval step, and prediction tensors.
     """
-    # If quantized, we need to create the correct eval graph for exporting.
-    eval_graph, bottleneck_tensor, resized_input_tensor, wants_quantization = (
-        create_module_graph(module_spec))
+    eval_graph = sess.graph
 
-    eval_sess = tf.Session(graph=eval_graph)
+    # If quantized, we need to create the correct eval graph for exporting.
+    height, width = hub.get_expected_image_size(module_spec)
+
+    resized_input_tensor = tf.placeholder(tf.float32, [None, height, width, 3])
+    m = hub.Module(module_spec)
+    bottleneck_tensor = m(resized_input_tensor)
+    wants_quantization = any(node.op in FAKE_QUANT_OPS for node in eval_graph.as_graph_def().node)
+
     with eval_graph.as_default():
-        # Add the new layer for exporting.
+        # Add the new layer
         (_, _, bottleneck_input,
          ground_truth_input, final_tensor) = add_final_retrain_ops(
             class_count, FLAGS['final_tensor_name'], bottleneck_tensor,
             wants_quantization, is_training=False)
 
-        # Now we need to restore the values from the training graph to the eval graph.
-        tf.train.Saver().restore(eval_sess, CHECKPOINT_NAME)
+        add_evaluation_step(final_tensor, ground_truth_input)
 
-        evaluation_step, prediction = add_evaluation_step(final_tensor, ground_truth_input)
-
-    return (eval_sess, resized_input_tensor, bottleneck_input, ground_truth_input,
-            evaluation_step, prediction)
+    return eval_graph
 
 
 def main():
@@ -505,18 +505,18 @@ def main():
                                 (datetime.now(), i, cross_entropy_value))
 
         # After training is complete, force one last save of the train checkpoint.
-        train_saver.save(sess, CHECKPOINT_NAME)
+        # train_saver.save(sess, CHECKPOINT_NAME)
 
-        sess, _, _, _, _, _ = build_eval_session(module_spec, class_count)
-        eval_graph = sess.graph
-        output_graph_def = tf.graph_util.convert_variables_to_constants(sess, eval_graph.as_graph_def(), [FLAGS['final_tensor_name']])
+        eval_graph = build_eval_graph(sess, module_spec, class_count)
+        output_graph_def = tf.graph_util.convert_variables_to_constants(sess,
+                                                                        eval_graph.as_graph_def(),
+                                                                        [FLAGS['final_tensor_name']])
 
         output_graph = tf.Graph()
         with output_graph.as_default():
             tf.import_graph_def(output_graph_def)
 
         # obtain the final graph
-        # graph, bottleneck_tensor, resized_input_tensor, wants_quantization = (create_module_graph(module_spec))
         input_layer = "Placeholder"
         output_layer = "final_result"
         input_name = "import/" + input_layer
