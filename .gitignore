@@ -1,5 +1,2 @@
 .idea/
 __pychache__/
-tmp-train/
-mytmp/
-static/predictions.*
