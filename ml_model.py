@@ -23,6 +23,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 
+import cache_bottlenecks
+
 # hard-coded FLAGS settings
 FLAGS = dict()
 
@@ -78,6 +80,10 @@ def get_image_path(image_lists, label_name, index, category):
     sub_dir = label_lists['dir']
     full_path = os.path.join(sub_dir, base_name)
     return full_path
+
+
+def get_bottleneck_path(image_path):
+    return image_path.replace("images", "bottlenecks").replace(".jpg", ".txt")
 
 
 def create_module_graph(module_spec):
@@ -207,40 +213,6 @@ def add_final_retrain_ops(class_count, final_tensor_name, bottleneck_tensor, qua
             final_tensor)
 
 
-def calculate_bottlenecks(module_spec):
-    """Creates the operations to apply the specified distortions.
-
-    During training it can help to improve the results if we run the images
-    through simple distortions like crops, scales, and flips. These reflect the
-    kind of variations we expect in the real world, and so can help train the
-    model to cope with natural data more effectively. Here we take the supplied
-    parameters and construct a network of operations to apply them to an image.
-
-    Args:
-      module_spec: The hub.ModuleSpec for the image module being used.
-
-    Returns:
-      The jpeg input layer and the distorted result tensor.
-    """
-    input_height, input_width = hub.get_expected_image_size(module_spec)
-    input_depth = hub.get_num_image_channels(module_spec)
-    jpeg_data = tf.placeholder(tf.string, name='DistortJPGInput')
-    decoded_image = tf.image.decode_jpeg(jpeg_data, channels=input_depth)
-    # Convert from full range of uint8 to range [0,1] of float32.
-    decoded_image_as_float = tf.image.convert_image_dtype(decoded_image,
-                                                          tf.float32)
-    decoded_image_4d = tf.expand_dims(decoded_image_as_float, 0)
-    precrop_shape = tf.stack([input_height, input_width])
-    precrop_shape_as_int = tf.cast(precrop_shape, dtype=tf.int32)
-    precropped_image = tf.image.resize_bilinear(decoded_image_4d,
-                                                precrop_shape_as_int)
-    precropped_image_3d = tf.squeeze(precropped_image, axis=[0])
-    cropped_image = tf.random_crop(precropped_image_3d,
-                                   [input_height, input_width, input_depth])
-    result = tf.expand_dims(cropped_image, 0, name='DistortResult')
-    return jpeg_data, result
-
-
 def add_evaluation_step(result_tensor, ground_truth_tensor):
     """Inserts the operations we need to evaluate the accuracy of our results.
 
@@ -260,56 +232,6 @@ def add_evaluation_step(result_tensor, ground_truth_tensor):
             evaluation_step = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('accuracy', evaluation_step)
     return evaluation_step, prediction
-
-
-def get_random_distorted_bottlenecks(
-        sess, image_lists, how_many, category, input_jpeg_tensor,
-        distorted_image, resized_input_tensor, bottleneck_tensor):
-    """Retrieves bottleneck values for training images, after distortions.
-
-    If we're training with distortions like crops, scales, or flips, we have to
-    recalculate the full model for every image, and so we can't use cached
-    bottleneck values. Instead we find random images for the requested category,
-    run them through the distortion graph, and then the full graph to get the
-    bottleneck results for each.
-
-    Args:
-      sess: Current TensorFlow Session.
-      image_lists: OrderedDict of training images for each label.
-      how_many: The integer number of bottleneck values to return.
-      category: Name string of which set of images to fetch - training, testing,
-      or validation.
-      input_jpeg_tensor: The input layer we feed the image data to.
-      distorted_image: The output node of the distortion graph.
-      resized_input_tensor: The input node of the recognition graph.
-      bottleneck_tensor: The bottleneck output layer of the CNN graph.
-
-    Returns:
-      List of bottleneck arrays and their corresponding ground truths.
-    """
-    class_count = len(image_lists.keys())
-    bottlenecks = []
-    ground_truths = []
-    for unused_i in range(how_many):
-        label_index = random.randrange(class_count)
-        label_name = list(image_lists.keys())[label_index]
-        image_index = random.randrange(MAX_NUM_IMAGES_PER_CLASS + 1)
-        image_path = get_image_path(image_lists, label_name, image_index, category)
-        if not tf.gfile.Exists(image_path):
-            tf.logging.fatal('File does not exist %s', image_path)
-        jpeg_data = tf.gfile.GFile(image_path, 'rb').read()
-
-        # Note that we materialize the distorted_image_data as a numpy array before
-        # sending running inference on the image. This involves 2 memory copies and
-        # might be optimized in other implementations.
-        distorted_image_data = sess.run(distorted_image,
-                                        {input_jpeg_tensor: jpeg_data})
-        bottleneck_values = sess.run(bottleneck_tensor,
-                                     {resized_input_tensor: distorted_image_data})
-        bottleneck_values = np.squeeze(bottleneck_values)
-        bottlenecks.append(bottleneck_values)
-        ground_truths.append(label_index)
-    return bottlenecks, ground_truths
 
 
 def read_tensor_from_image_file(file_name,
@@ -338,6 +260,37 @@ def read_tensor_from_image_file(file_name,
     result = sess.run(normalized)
 
     return result
+
+
+def get_random_cached_bottlenecks(image_lists, category):
+    """Retrieves bottleneck values for cached images.
+    If no distortions are being applied, this function can retrieve the cached
+    bottleneck values directly from disk for images. It picks a random set of
+    images from the specified category.
+    Args:
+      image_lists: OrderedDict of training images for each label.
+      category: Name string of which set to pull from - training, testing, or
+      validation.
+    Returns:
+      List of bottleneck arrays, their corresponding ground truths, and the
+      relevant filenames.
+    """
+    bottlenecks = []
+    ground_truths = []
+    filenames = []
+
+    # Retrieve all bottlenecks.
+    for label_index, label_name in enumerate(image_lists.keys()):
+        for image_index, image_name in enumerate(
+                image_lists[label_name][category]):
+            image_name = get_image_path(image_lists, label_name, image_index, category)
+            bottleneck_path = get_bottleneck_path(image_name)
+            bottleneck = cache_bottlenecks.get_bottleneck(bottleneck_path)
+            bottlenecks.append(bottleneck)
+            ground_truths.append(label_index)
+            filenames.append(image_name)
+
+    return bottlenecks, ground_truths, filenames
 
 
 def build_eval_graph(sess, module_spec, class_count):
@@ -378,8 +331,8 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # create lists of all the images - not working through the actual folder system
-    image_lists = OrderedDict([('nontufa', {'dir': 'static/img', 'training': nontufa_image_list}),
-                               ('tufa', {'dir': 'static/img', 'training': tufa_image_list})])
+    image_lists = OrderedDict([('nontufa', {'dir': 'static/images', 'training': nontufa_image_list}),
+                               ('tufa', {'dir': 'static/images', 'training': tufa_image_list})])
 
     # order needs to be the same as in the dict!
     labels = ['nontufa', 'tufa']
@@ -406,10 +359,6 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
         # Set up the image decoding sub-graph.
         jpeg_data_tensor, decoded_image_tensor = add_jpeg_decoding(module_spec)
 
-        # We will be applying distortions, so set up the operations we'll need.
-        (jpeg_data_tensor,
-         image_tensor) = calculate_bottlenecks(module_spec)
-
         # Create the operations we need to evaluate the accuracy of our new layer.
         evaluation_step, _ = add_evaluation_step(final_tensor, ground_truth_input)
 
@@ -419,11 +368,9 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
         # when exporting models.
         train_saver = tf.train.Saver()
 
-        # Get a batch of input bottleneck values, calculated fresh every time with distortions applied
+        # Get a batch of input bottleneck values
         (train_bottlenecks,
-         train_ground_truth) = get_random_distorted_bottlenecks(
-            sess, image_lists, FLAGS['train_batch_size'], 'training',
-            jpeg_data_tensor, image_tensor, resized_image_tensor, bottleneck_tensor)
+         train_ground_truth, _) = get_random_cached_bottlenecks(image_lists, 'training')
 
         # Run the training for as many cycles as requested on the command line.
         for i in range(FLAGS['how_many_training_steps']):
@@ -476,7 +423,7 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
     for file_name in all_image_list:
         if file_name.lower().endswith(".jpg"):
             t = read_tensor_from_image_file(
-                os.path.join('static/img', file_name),
+                os.path.join('static/images', file_name),
                 input_height=input_height,
                 input_width=input_width,
                 input_mean=input_mean,
@@ -497,6 +444,7 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
 
     return pred_list
 
+
 import time
 
 if __name__ == '__main__':
@@ -513,5 +461,4 @@ if __name__ == '__main__':
     end = time.time()
 
     print()
-    print("timing", end-start)
-
+    print("timing", end - start)

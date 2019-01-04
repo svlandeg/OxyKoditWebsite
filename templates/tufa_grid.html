@@ -10,7 +10,7 @@
         <form action="{{ url_for('grid') }}" method="post">
             {% for row in image_indices|batch(grid_width) %}
                 {% for img in row %}
-                    <input style="width:130px; height:110px; border:5px solid {{ border_colors[img] }}; background: linear-gradient(rgba{{ bg_colors[img] }}, rgba{{ bg_colors[img] }}), url({{ url_for('static/img', filename='img' + img|string + '.jpg') }}); color: transparent;" type="submit" name="index_clicked" value="{{ img }}" alt="Image {{ img_index }}" />
+                    <input style="width:130px; height:110px; border:5px solid {{ border_colors[img] }}; background: linear-gradient(rgba{{ bg_colors[img] }}, rgba{{ bg_colors[img] }}), url({{ url_for('static', filename='images/img' + img|string + '.jpg') }}); color: transparent;" type="submit" name="index_clicked" value="{{ img }}" alt="Image {{ img_index }}" />
                 {% endfor %}
                 <br />
             {% endfor %}
