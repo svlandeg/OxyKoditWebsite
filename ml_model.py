@@ -25,7 +25,10 @@ import tensorflow_hub as hub
 
 # hard-coded FLAGS settings
 FLAGS = dict()
-FLAGS['tfhub_module'] = 'https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'
+
+# model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'
+FLAGS['tfhub_module'] = 'static/ml_model/mobilenet_v2_100_224/'
+
 FLAGS['final_tensor_name'] = 'final_result'
 FLAGS['how_many_training_steps'] = 12
 FLAGS['learning_rate'] = 0.01
@@ -294,7 +297,7 @@ def get_random_distorted_bottlenecks(
         image_path = get_image_path(image_lists, label_name, image_index, category)
         if not tf.gfile.Exists(image_path):
             tf.logging.fatal('File does not exist %s', image_path)
-        jpeg_data = tf.gfile.FastGFile(image_path, 'rb').read()
+        jpeg_data = tf.gfile.GFile(image_path, 'rb').read()
 
         # Note that we materialize the distorted_image_data as a numpy array before
         # sending running inference on the image. This involves 2 memory copies and
@@ -375,8 +378,8 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # create lists of all the images - not working through the actual folder system
-    image_lists = OrderedDict([('nontufa', {'dir': 'static', 'training': nontufa_image_list}),
-                               ('tufa', {'dir': 'static', 'training': tufa_image_list})])
+    image_lists = OrderedDict([('nontufa', {'dir': 'static/img', 'training': nontufa_image_list}),
+                               ('tufa', {'dir': 'static/img', 'training': tufa_image_list})])
 
     # order needs to be the same as in the dict!
     labels = ['nontufa', 'tufa']
@@ -473,7 +476,7 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
     for file_name in all_image_list:
         if file_name.lower().endswith(".jpg"):
             t = read_tensor_from_image_file(
-                os.path.join('static', file_name),
+                os.path.join('static/img', file_name),
                 input_height=input_height,
                 input_width=input_width,
                 input_mean=input_mean,
@@ -490,13 +493,14 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
             # we only care about the tufa % prediction
             for i in top_k:
                 if labels[i] == "tufa":
-                    # print(file_name, str(results[i]))
                     pred_list.append(results[i])
 
     return pred_list
 
+import time
 
 if __name__ == '__main__':
+    start = time.time()
     my_tufa_image_list = ['img2.jpg']
     my_nontufa_image_list = ['img0.jpg', 'img1.jpg']
     my_all_image_list = []
@@ -506,4 +510,8 @@ if __name__ == '__main__':
 
     for img, pred in zip(my_all_image_list, my_pred_list):
         print(img, pred)
+    end = time.time()
+
+    print()
+    print("timing", end-start)
 

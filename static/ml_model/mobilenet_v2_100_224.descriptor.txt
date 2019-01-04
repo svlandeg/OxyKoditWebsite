@@ -1,0 +1,3 @@
+Module: https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2
+Download Time: 2019-01-04 12:37:15.243055
+Downloader Hostname: Laptop-OxyKodit (PID:804)
