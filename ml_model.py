@@ -478,7 +478,7 @@ if __name__ == '__main__':
     my_tufa_image_list = ['img2.jpg']
     my_nontufa_image_list = ['img0.jpg', 'img1.jpg']
     my_all_image_list = []
-    for i in range(30):
+    for i in range(25):
         my_all_image_list.append("img" + str(i) + ".jpg")
     my_pred_list = main(my_tufa_image_list, my_nontufa_image_list, my_all_image_list)
 
