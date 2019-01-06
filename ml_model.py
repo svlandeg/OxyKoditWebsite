@@ -360,8 +360,8 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # create lists of all the images - not working through the actual folder system
-    image_lists = OrderedDict([('nontufa', {'dir': 'static/images', 'training': nontufa_image_list}),
-                               ('tufa', {'dir': 'static/images', 'training': tufa_image_list})])
+    image_lists = OrderedDict([('nontufa', {'dir': 'static/img', 'training': nontufa_image_list}),
+                               ('tufa', {'dir': 'static/img', 'training': tufa_image_list})])
 
     # order needs to be the same as in the dict!
     labels = ['nontufa', 'tufa']
@@ -451,7 +451,7 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
     for file_name in all_image_list:
         if file_name.lower().endswith(".jpg"):
             t = read_tensor_from_image_file(
-                os.path.join('static/images', file_name),
+                os.path.join('static/img', file_name),
                 input_height=input_height,
                 input_width=input_width,
                 input_mean=input_mean,
