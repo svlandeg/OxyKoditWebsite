@@ -1,0 +1,3 @@
+Module: https://tfhub.dev/google/imagenet/mobilenet_v2_035_128/feature_vector/2
+Download Time: 2019-01-06 13:46:31.135776
+Downloader Hostname: Laptop (PID:7936)

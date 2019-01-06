@@ -17,19 +17,21 @@ from __future__ import print_function
 from collections import OrderedDict
 from datetime import datetime
 import os.path
-import random
-
+import time
 import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
-
-import cache_bottlenecks
 
 # hard-coded FLAGS settings
 FLAGS = dict()
 
 # model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'
-FLAGS['tfhub_module'] = 'static/ml_model/mobilenet_v2_100_224/'
+# FLAGS['tfhub_module'] = 'static/ml_model/mobilenet_v2_100_224/'
+# IMG_SIZE = 224
+
+# model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_035_128/feature_vector/2'
+FLAGS['tfhub_module'] = 'static/ml_model/mobilenet_v2_035_128/'
+IMG_SIZE = 128
 
 FLAGS['final_tensor_name'] = 'final_result'
 FLAGS['how_many_training_steps'] = 12
@@ -82,8 +84,29 @@ def get_image_path(image_lists, label_name, index, category):
     return full_path
 
 
-def get_bottleneck_path(image_path):
-    return image_path.replace("images", "bottlenecks").replace(".jpg", ".txt")
+def run_bottleneck_on_image(sess, image_path, image_data_tensor,
+                            decoded_image_tensor, resized_input_tensor,
+                            bottleneck_tensor):
+    """Runs inference on an image to extract the 'bottleneck' summary layer.
+    Args:
+      sess: Current active TensorFlow Session.
+      image_path: location of raw JPEG data.
+      image_data_tensor: Input data layer in the graph.
+      decoded_image_tensor: Output of initial image resizing and preprocessing.
+      resized_input_tensor: The input node of the recognition graph.
+      bottleneck_tensor: Layer before the final softmax.
+    Returns:
+      Numpy array of bottleneck values.
+    """
+    # First decode the JPEG image, resize it, and rescale the pixel values.
+    image_data = tf.gfile.GFile(image_path, 'rb').read()
+    resized_input_values = sess.run(decoded_image_tensor,
+                                    {image_data_tensor: image_data})
+    # Then run it through the recognition network.
+    bottleneck_values = sess.run(bottleneck_tensor,
+                                 {resized_input_tensor: resized_input_values})
+    bottleneck_values = np.squeeze(bottleneck_values)
+    return bottleneck_values
 
 
 def create_module_graph(module_spec):
@@ -262,8 +285,11 @@ def read_tensor_from_image_file(file_name,
     return result
 
 
-def get_random_cached_bottlenecks(image_lists, category):
-    """Retrieves bottleneck values for cached images.
+def get_bottlenecks(image_lists, category, sess, image_data_tensor,
+                                  decoded_image_tensor, resized_input_tensor,
+                                  bottleneck_tensor):
+    """
+    Retrieves bottleneck values for cached images.
     If no distortions are being applied, this function can retrieve the cached
     bottleneck values directly from disk for images. It picks a random set of
     images from the specified category.
@@ -283,9 +309,12 @@ def get_random_cached_bottlenecks(image_lists, category):
     for label_index, label_name in enumerate(image_lists.keys()):
         for image_index, image_name in enumerate(
                 image_lists[label_name][category]):
-            image_name = get_image_path(image_lists, label_name, image_index, category)
-            bottleneck_path = get_bottleneck_path(image_name)
-            bottleneck = cache_bottlenecks.get_bottleneck(bottleneck_path)
+            image_path = get_image_path(image_lists, label_name, image_index, category)
+
+            bottleneck = run_bottleneck_on_image(sess, image_path, image_data_tensor,
+                                                 decoded_image_tensor, resized_input_tensor,
+                                                 bottleneck_tensor)
+
             bottlenecks.append(bottleneck)
             ground_truths.append(label_index)
             filenames.append(image_name)
@@ -370,7 +399,9 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
 
         # Get a batch of input bottleneck values
         (train_bottlenecks,
-         train_ground_truth, _) = get_random_cached_bottlenecks(image_lists, 'training')
+         train_ground_truth, _) = get_bottlenecks(image_lists, 'training', sess, jpeg_data_tensor,
+                                                                decoded_image_tensor, resized_image_tensor,
+                                                                bottleneck_tensor)
 
         # Run the training for as many cycles as requested on the command line.
         for i in range(FLAGS['how_many_training_steps']):
@@ -393,9 +424,6 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
                 tf.logging.info('%s: Step %d: Cross entropy = %f' %
                                 (datetime.now(), i, cross_entropy_value))
 
-        # After training is complete, force one last save of the train checkpoint.
-        # train_saver.save(sess, CHECKPOINT_NAME)
-
         eval_graph = build_eval_graph(sess, module_spec, class_count)
         output_graph_def = tf.graph_util.convert_variables_to_constants(sess,
                                                                         eval_graph.as_graph_def(),
@@ -413,11 +441,11 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
         input_operation = output_graph.get_operation_by_name(input_name)
         output_operation = output_graph.get_operation_by_name(output_name)
 
-        # predict
-        input_height = 224
-        input_width = 224
-        input_mean = 0
-        input_std = 224
+    # predict
+    input_height = IMG_SIZE
+    input_width = IMG_SIZE
+    input_mean = 0
+    input_std = IMG_SIZE
 
     pred_list = []
     for file_name in all_image_list:
@@ -444,8 +472,6 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
 
     return pred_list
 
-
-import time
 
 if __name__ == '__main__':
     start = time.time()
