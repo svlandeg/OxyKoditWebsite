@@ -17,8 +17,8 @@ def overview():
 
 @app.route('/grid/', methods=['GET', 'POST'])
 def grid():
-    img_nr = 42
-    grid_width = 6
+    img_nr = 30
+    grid_width = 5
 
     # retrieve the POST parameters or set default ones
     if request.method == 'POST':
