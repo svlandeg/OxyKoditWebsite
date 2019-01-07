@@ -71,8 +71,7 @@ def get_image_path(image_lists, label_name, index, category):
                          label_name, category)
     mod_index = index % len(category_list)
     base_name = category_list[mod_index]
-    my_dir = os.path.dirname(__file__)
-    sub_dir = os.path.join(my_dir, label_lists['dir'])
+    sub_dir = label_lists['dir']
     full_path = os.path.join(sub_dir, base_name)
     return full_path
 
@@ -353,8 +352,11 @@ def main(tufa_image_list, nontufa_image_list, all_image_list, model_url, img_siz
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # create lists of all the images - not working through the actual folder system
-    image_lists = OrderedDict([('nontufa', {'dir': 'static/img', 'training': nontufa_image_list}),
-                               ('tufa', {'dir': 'static/img', 'training': tufa_image_list})])
+    my_dir = os.path.dirname(__file__)
+    img_dir = os.path.join(my_dir, 'static/img')
+
+    image_lists = OrderedDict([('nontufa', {'dir': img_dir, 'training': nontufa_image_list}),
+                               ('tufa', {'dir': img_dir, 'training': tufa_image_list})])
 
     # order needs to be the same as in the dict!
     labels = ['nontufa', 'tufa']
