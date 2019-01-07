@@ -446,7 +446,7 @@ def main(tufa_image_list, nontufa_image_list, all_image_list, model_url, img_siz
     for file_name in all_image_list:
         if file_name.lower().endswith(".jpg"):
             t = read_tensor_from_image_file(
-                os.path.join('static/img', file_name),
+                os.path.join(img_dir, file_name),
                 input_height=input_height,
                 input_width=input_width,
                 input_mean=input_mean,
