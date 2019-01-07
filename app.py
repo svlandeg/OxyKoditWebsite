@@ -1,15 +1,18 @@
 from flask import Flask, render_template, request
 import ml_model
+import os
 
 app = Flask(__name__)
 
 
 def get_ml_model():
+    my_dir = os.path.dirname(__file__)
+
     # model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'
-    # return 224, 'ml_model/mobilenet_v2_100_224/'
+    # return 224, os.path.join(my_dir, 'ml_model/mobilenet_v2_100_224/')
 
     # model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_035_128/feature_vector/2'
-    return 128, 'ml_model/mobilenet_v2_035_128/'
+    return 128, os.path.join(my_dir, 'ml_model/mobilenet_v2_035_128/')
 
 
 @app.route('/')
