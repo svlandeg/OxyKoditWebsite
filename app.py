@@ -4,6 +4,14 @@ import ml_model
 app = Flask(__name__)
 
 
+def get_ml_model():
+    # model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'
+    # return 224, 'ml_model/mobilenet_v2_100_224/'
+
+    # model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_035_128/feature_vector/2'
+    return 128, 'ml_model/mobilenet_v2_035_128/'
+
+
 @app.route('/')
 def index():
     return 'Website under construction !'
@@ -13,6 +21,7 @@ def index():
 def overview():
     par = "This is some random text that doesn't have HTML formatting"
     return render_template('basic.html', title="OxyKodit overview", body=par)
+
 
 
 @app.route('/grid/', methods=['GET', 'POST'])
@@ -52,7 +61,8 @@ def grid():
 
     # train the model and make preditions
     if allow_training and to_retrain == "Yes":
-        preds = ml_model.main(tufa_image_list, nontufa_image_list, all_image_list)
+        img_size, model = get_ml_model()
+        preds = ml_model.main(tufa_image_list, nontufa_image_list, all_image_list, model, img_size)
 
     # return the HTML page
     return render_template('tufa_grid.html',

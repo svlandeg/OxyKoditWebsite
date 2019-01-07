@@ -25,14 +25,6 @@ import tensorflow_hub as hub
 # hard-coded FLAGS settings
 FLAGS = dict()
 
-# model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/2'
-# FLAGS['tfhub_module'] = 'static/ml_model/mobilenet_v2_100_224/'
-# IMG_SIZE = 224
-
-# model cached from 'https://tfhub.dev/google/imagenet/mobilenet_v2_035_128/feature_vector/2'
-FLAGS['tfhub_module'] = 'static/ml_model/mobilenet_v2_035_128/'
-IMG_SIZE = 128
-
 FLAGS['final_tensor_name'] = 'final_result'
 FLAGS['how_many_training_steps'] = 12
 FLAGS['learning_rate'] = 0.01
@@ -356,7 +348,7 @@ def build_eval_graph(sess, module_spec, class_count):
     return eval_graph
 
 
-def main(tufa_image_list, nontufa_image_list, all_image_list):
+def main(tufa_image_list, nontufa_image_list, all_image_list, model_url, img_size):
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # create lists of all the images - not working through the actual folder system
@@ -369,7 +361,7 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
     class_count = len(image_lists.keys())
 
     # Set up the pre-trained graph.
-    module_spec = hub.load_module_spec(FLAGS['tfhub_module'])
+    module_spec = hub.load_module_spec(model_url)
     graph, bottleneck_tensor, resized_image_tensor, wants_quantization = (create_module_graph(module_spec))
 
     # Add the new layer that we'll be training.
@@ -442,10 +434,10 @@ def main(tufa_image_list, nontufa_image_list, all_image_list):
         output_operation = output_graph.get_operation_by_name(output_name)
 
     # predict
-    input_height = IMG_SIZE
-    input_width = IMG_SIZE
+    input_height = img_size
+    input_width = img_size
     input_mean = 0
-    input_std = IMG_SIZE
+    input_std = img_size
 
     pred_list = []
     for file_name in all_image_list:
