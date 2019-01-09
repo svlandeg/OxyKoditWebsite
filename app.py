@@ -17,14 +17,13 @@ def get_ml_model():
 
 @app.route('/')
 def index():
-    return 'Website under construction !'
+    return render_template('index_redirect.html')
 
 
 @app.route('/overview/')
 def overview():
     par = "This is some random text that doesn't have HTML formatting"
     return render_template('basic.html', title="OxyKodit overview", body=par)
-
 
 
 @app.route('/grid/', methods=['GET', 'POST'])

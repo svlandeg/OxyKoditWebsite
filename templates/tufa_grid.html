@@ -6,19 +6,19 @@
     </head>
 
     <body>
-        <h1>{{ title }}</h1>
         <form action="{{ url_for('grid') }}" method="post">
             {% for row in image_indices|batch(grid_width) %}
+                <p style="margin: 5px">
                 {% for img in row %}
-                    <input style="width:130px; height:110px; border:5px solid {{ border_colors[img] }}; background: linear-gradient(rgba{{ bg_colors[img] }}, rgba{{ bg_colors[img] }}), url({{ url_for('static', filename='img/img' + img|string + '.jpg') }}); color: transparent;" type="submit" name="index_clicked" value="{{ img }}" alt="Image {{ img_index }}" />
+                    <input style="width:154px; height:124px; border:5px solid {{ border_colors[img] }}; background: linear-gradient(rgba{{ bg_colors[img] }}, rgba{{ bg_colors[img] }}), url({{ url_for('static', filename='img/img' + img|string + '.jpg') }}); color: transparent;" type="submit" name="index_clicked" value="{{ img }}" alt="Image {{ img_index }}" />
                 {% endfor %}
-                <br />
+                </p>
             {% endfor %}
             <input type="hidden" name="border_indices" value={{ border_indices }} />
             <input type="hidden" name="retrain" value="No" />
         </form>
         <form action="{{ url_for('grid') }}" method="post">
-            <button type="submit" {{ train_disabled }}>Train</button>
+            <button type="submit" {{ train_disabled }} style="border:5px solid white; width:250px; height:40px; background:lightsteelblue; font-size : 16px">Train image classifier</button>
             <input type="hidden" name="border_indices" value={{ border_indices }} />
             <input type="hidden" name="retrain" value="Yes" />
         </form>
