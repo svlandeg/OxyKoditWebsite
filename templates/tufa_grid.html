@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <meta charset="UTF-8">
+        <meta charset="UTF-8" http-equiv="x-ua-compatible" content="IE=edge" />
         <title>{{ title }}</title>
     </head>
 
@@ -10,7 +10,7 @@
             {% for row in image_indices|batch(grid_width) %}
                 <p style="margin: 5px">
                 {% for img in row %}
-                    <input style="width:154px; height:124px; border:5px solid {{ border_colors[img] }}; background: linear-gradient(rgba{{ bg_colors[img] }}, rgba{{ bg_colors[img] }}), url({{ url_for('static', filename='img/img' + img|string + '.jpg') }}); color: transparent;" type="submit" name="index_clicked" value="{{ img }}" alt="Image {{ img_index }}" />
+                    <input style="width:140px; height:110px; box-shadow: inset 0 0 0 2px #fff; border:5px solid {{ border_colors[img] }}; background: linear-gradient(rgba{{ bg_colors[img] }}, rgba{{ bg_colors[img] }}), url({{ url_for('static', filename='img/img' + img|string + '.jpg') }}); color: transparent;" type="submit" name="index_clicked" value="{{ img }}" alt="Image {{ img_index }}" />
                 {% endfor %}
                 </p>
             {% endfor %}

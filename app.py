@@ -97,5 +97,5 @@ def _get_bg_color(tufa_pred_float):
     r = (1-tufa_pred_float)*255
     g = tufa_pred_float * 255
 
-    return "(" + str(r) + "," + str(g) + ",127.5, " + str(transparant) + ")"
+    return "(" + str(int(r)) + "," + str(int(g)) + ",127, " + str(transparant) + ")"
 
