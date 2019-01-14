@@ -29,6 +29,11 @@ def get_ml_model():
     return 128, os.path.join(my_dir, 'ml_model/mobilenet_v2_035_128/')
 
 
+def msg_file():
+    my_dir = os.path.dirname(__file__)
+    return os.path.join(my_dir, 'static/msg.txt')
+
+
 @app.route('/')
 def index():
     return render_template('index_redirect.html')
@@ -78,6 +83,9 @@ def grid():
 
     # return the HTML page
     if show_static == "Yes":
+        with open(msg_file(), 'r') as f:
+            messages = f.read().splitlines()
+
         return render_template('tufa_grid_static.html',
                                grid_width=grid_width,
                                title="Tufa image grid",
@@ -85,7 +93,8 @@ def grid():
                                image_indices=range(img_nr),
                                border_colors=[_get_border_color(color_list[i]) for i in range(img_nr)],
                                bg_colors=[_get_bg_color(preds[i]) for i in range(img_nr)],
-                               train_disabled=train_disabled)
+                               train_disabled=train_disabled,
+                               messages=messages)
     else:
         return render_template('tufa_grid.html',
                                grid_width=grid_width,

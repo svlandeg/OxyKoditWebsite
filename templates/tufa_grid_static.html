@@ -1,40 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" http-equiv="x-ua-compatible" content="IE=edge" />
-        <title>{{ title }}</title>
-    </head>
+<head>
+    <meta charset="UTF-8" http-equiv="x-ua-compatible" content="IE=edge"/>
+    <title>{{ title }}</title>
+</head>
 
-    <body>
-        <script language="javascript">
-            setTimeout(function() {
-                document.forms[1].submit();
-            }, 1);
+<body>
+<script language="javascript">
+    setTimeout(function () {
+        document.forms[1].submit();
+    }, 1);
 
-             function update() {
-                    document.getElementById("jstext").innerHTML = "Today is: " + new Date().getMilliseconds();
+    function update() {
+        var msg = {{ messages|tojson }};
+        var index = Math.floor(Math.random() * msg.length);
+        document.getElementById("jstext").value = msg[index];
+    }
 
-             }
-             setInterval(update, 1000);
-        </script>
+    setInterval(update, 1000);
+</script>
 
-        <form action="{{ url_for('grid') }}" method="post">
-            {% for row in image_indices|batch(grid_width) %}
-                <p style="margin: 5px">
-                {% for img in row %}
-                    <input style="width:128px; height:98px; box-shadow: inset 0 0 0 2px #fff; border:5px solid {{ border_colors[img] }}; background: linear-gradient(rgba{{ bg_colors[img] }}, rgba{{ bg_colors[img] }}), url({{ url_for('static', filename='img/img' + img|string + '.jpg') }}); color: transparent;" name="index_clicked" value="{{ img }}" alt="Image {{ img_index }}" />
-                {% endfor %}
-                </p>
+<form action="{{ url_for('grid') }}" method="post">
+    {% for row in image_indices|batch(grid_width) %}
+        <p style="margin: 5px">
+            {% for img in row %}
+                <input style="width:128px; height:98px; box-shadow: inset 0 0 0 2px #fff; border:5px solid {{ border_colors[img] }}; background: linear-gradient(rgba{{ bg_colors[img] }}, rgba{{ bg_colors[img] }}), url({{ url_for('static', filename='img/img' + img|string + '.jpg') }}); color: transparent;"
+                       name="index_clicked" value="{{ img }}" alt="Image {{ img_index }}"/>
             {% endfor %}
-            <input type="hidden" name="border_indices" value={{ border_indices }} />
-            <input type="hidden" name="retrain" value="No" />
-        </form>
-        <form action="{{ url_for('grid') }}" method="post">
-            <input type="hidden" name="border_indices" value={{ border_indices }} />
-            <input type="hidden" name="retrain" value="Yes" />
-            <input type="hidden" name="show_static" value="No" />
+        </p>
+    {% endfor %}
+    <input type="hidden" name="border_indices" value={{ border_indices }} />
+    <input type="hidden" name="retrain" value="No"/>
+</form>
+<form action="{{ url_for('grid') }}" method="post">
+    <input type="hidden" name="border_indices" value={{ border_indices }} />
+    <input type="hidden" name="retrain" value="Yes"/>
+    <input type="hidden" name="show_static" value="No"/>
 
-            <div style="border:5px solid white; width:250px; height:40px; background:lightsteelblue; font-size : 16px" id="jstext"></div>
-        </form>
-    </body>
+    <input type="text" style="border:5px solid white; width:248px; height:38px; background:lightsteelblue; font-size : 16px; text-align: center;"
+         id="jstext" value=""/>
+</form>
+</body>
 </html>
