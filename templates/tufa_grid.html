@@ -6,6 +6,15 @@
     </head>
 
     <body>
+
+
+        <script language="javascript">
+             function update() {
+                    document.getElementById("jstext").innerHTML = "Today is: " + new Date().getMilliseconds();
+             }
+             setInterval(update, 1000);
+        </script>
+
         <form action="{{ url_for('grid') }}" method="post">
             {% for row in image_indices|batch(grid_width) %}
                 <p style="margin: 5px">
@@ -21,6 +30,9 @@
             <button type="submit" {{ train_disabled }} style="border:5px solid white; width:250px; height:40px; background:lightsteelblue; font-size : 16px">Train image classifier</button>
             <input type="hidden" name="border_indices" value={{ border_indices }} />
             <input type="hidden" name="retrain" value="Yes" />
+
+            <div id="jstext"></div>
+
         </form>
     </body>
 </html>
