@@ -2,6 +2,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# ==============================================================================
+# By Sofie Van Landeghem @ OxyKodit
+#
+# Code to run the Deep Learning image recognition demo online
+# (http://www.oxykodit.com/blog/tufa)
+#
 # This work was derived from tensorflow/examples/image_retraining (TensorFlow Authors)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -9,9 +15,6 @@ from __future__ import print_function
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-# It was further edited by Sofie Van Landeghem @ OxyKodit to enable online Tufa learning
-#
 # ==============================================================================
 
 from collections import OrderedDict
@@ -278,17 +281,10 @@ def read_tensor_from_image_file(file_name,
 
 
 def get_bottlenecks(image_lists, category, sess, image_data_tensor,
-                                  decoded_image_tensor, resized_input_tensor,
-                                  bottleneck_tensor):
+                    decoded_image_tensor, resized_input_tensor,
+                    bottleneck_tensor):
     """
-    Retrieves bottleneck values for cached images.
-    If no distortions are being applied, this function can retrieve the cached
-    bottleneck values directly from disk for images. It picks a random set of
-    images from the specified category.
-    Args:
-      image_lists: OrderedDict of training images for each label.
-      category: Name string of which set to pull from - training, testing, or
-      validation.
+    Retrieves bottleneck values for all images.
     Returns:
       List of bottleneck arrays, their corresponding ground truths, and the
       relevant filenames.
@@ -352,8 +348,8 @@ def main(tufa_image_list, nontufa_image_list, all_image_list, model_url, img_siz
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # create lists of all the images - not working through the actual folder system
-    my_dir = os.path.dirname(__file__)
-    img_dir = os.path.join(my_dir, 'static/img')
+    current_dir = os.path.dirname(__file__)
+    img_dir = os.path.join(current_dir, 'static/img')
 
     image_lists = OrderedDict([('nontufa', {'dir': img_dir, 'training': nontufa_image_list}),
                                ('tufa', {'dir': img_dir, 'training': tufa_image_list})])
@@ -387,16 +383,13 @@ def main(tufa_image_list, nontufa_image_list, all_image_list, model_url, img_siz
         evaluation_step, _ = add_evaluation_step(final_tensor, ground_truth_input)
 
         merged = tf.summary.merge_all()
-
-        # Create a train saver that is used to restore values into an eval graph
-        # when exporting models.
-        train_saver = tf.train.Saver()
+        tf.train.Saver()
 
         # Get a batch of input bottleneck values
         (train_bottlenecks,
          train_ground_truth, _) = get_bottlenecks(image_lists, 'training', sess, jpeg_data_tensor,
-                                                                decoded_image_tensor, resized_image_tensor,
-                                                                bottleneck_tensor)
+                                                  decoded_image_tensor, resized_image_tensor,
+                                                  bottleneck_tensor)
 
         # Run the training for as many cycles as requested on the command line.
         for i in range(FLAGS['how_many_training_steps']):
@@ -470,13 +463,20 @@ def main(tufa_image_list, nontufa_image_list, all_image_list, model_url, img_siz
 
 if __name__ == '__main__':
     start = time.time()
+
+    # setting up the images, selecting 1 as tufa and 2 as non-tufa
     my_tufa_image_list = ['img2.jpg']
     my_nontufa_image_list = ['img0.jpg', 'img1.jpg']
     my_all_image_list = []
-    for i in range(25):
-        my_all_image_list.append("img" + str(i) + ".jpg")
-    my_pred_list = main(my_tufa_image_list, my_nontufa_image_list, my_all_image_list)
+    for r in range(25):
+        my_all_image_list.append("img" + str(r) + ".jpg")
 
+    # running the ML pipeline
+    my_dir = os.path.dirname(__file__)
+    my_model = os.path.join(my_dir, 'ml_model/mobilenet_v2_035_128/')
+    my_pred_list = main(my_tufa_image_list, my_nontufa_image_list, my_all_image_list, my_model, 128)
+
+    # printing the results
     for img, pred in zip(my_all_image_list, my_pred_list):
         print(img, pred)
     end = time.time()

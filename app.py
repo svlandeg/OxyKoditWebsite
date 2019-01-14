@@ -2,6 +2,20 @@ from flask import Flask, render_template, request
 import ml_model
 import os
 
+# ==============================================================================
+# By Sofie Van Landeghem @ OxyKodit
+#
+# Flask framework to run the Deep Learning image recognition demo online
+# (http://www.oxykodit.com/blog/tufa)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+# ==============================================================================
+
+
 app = Flask(__name__)
 
 
@@ -18,12 +32,6 @@ def get_ml_model():
 @app.route('/')
 def index():
     return render_template('index_redirect.html')
-
-
-@app.route('/overview/')
-def overview():
-    par = "This is some random text that doesn't have HTML formatting"
-    return render_template('basic.html', title="OxyKodit overview", body=par)
 
 
 @app.route('/grid/', methods=['GET', 'POST'])
