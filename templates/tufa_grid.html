@@ -20,7 +20,7 @@
 </form>
 <form action="{{ url_for('grid') }}" method="post">
     <button type="submit" {{ train_disabled }}
-            style="border:5px solid white; width:260px; height:50px; background:lightsteelblue; font-size : 16px">Train
+            style="border:1px solid grey; width:450px; height:70px; background:lightsteelblue; font-size : 16px">Train
         image classifier
     </button>
     <input type="hidden" name="border_indices" value={{ border_indices }} />

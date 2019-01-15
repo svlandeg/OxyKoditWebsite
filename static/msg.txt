@@ -1,4 +1,39 @@
-msg1 is quite something
-2 here is another one
-and yet 3 one
-what do you think of 4
+Hunting the Millenium Bug
+Consulting Alexa
+Ignoring Dr. Watson's advice
+Convoluting the Convolutions
+Praying to the Old Gods and the New
+Sending out the Ravens
+Trying not to go out-of-bounds
+Opening Pandora's box
+Looking through Googly eyes
+Mining some Bitcoin
+Surfing the Tensor Flow
+Using the Force
+Calculating 42th digit of Pi
+Breaking out of the Matrix
+Massaging the Data
+Unpickling the Pickle
+Changing bits from 0 to 1
+Pulling the String
+Poking the Pixels
+4, 8, 15, 16, 23, 42 
+Looking through the Windows
+Compiling the Kernel
+Instagramming the right Model
+Predicting the next US president
+Reinventing the .whl
+Pip installing the Oracle
+Opening a Flask of magic
+Feeding the Python
+Comprehending the List
+Importing antigravity
+Floating the numbers
+Performing a Boolean search
+Copying the answers from StackOverflow
+Inheriting some family members
+Storing my relations in the database
+Turning Coffee into Code
+Hanging out in the Foo Bar
+Trying to See Sharp
+Dangling the pointer

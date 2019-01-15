@@ -14,10 +14,12 @@
     function update() {
         var msg = {{ messages|tojson }};
         var index = Math.floor(Math.random() * msg.length);
-        document.getElementById("jstext").value = msg[index];
+        document.getElementById("jstext").textContent  += "\n";
+        document.getElementById("jstext").textContent  += msg[index];
+        document.getElementById("jstext").scrollTop = document.getElementById("jstext").scrollHeight;
     }
 
-    setInterval(update, 1000);
+    setInterval(update, 2000);
 </script>
 
 <form action="{{ url_for('grid') }}" method="post">
@@ -37,8 +39,8 @@
     <input type="hidden" name="retrain" value="Yes"/>
     <input type="hidden" name="show_static" value="No"/>
 
-    <input type="text" style="border:5px solid white; width:248px; height:38px; background:lightsteelblue; font-size : 16px; text-align: center;"
-         id="jstext" value=""/>
+    <textarea class="scrollabletextbox" style="border:1px solid white; width:450px; height:70px; background:lightsteelblue; font-size : 16px; text-align: center;"
+         id="jstext">Training the model</textarea>
 </form>
 </body>
 </html>
