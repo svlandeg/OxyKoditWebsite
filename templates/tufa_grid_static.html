@@ -19,7 +19,7 @@
         document.getElementById("jstext").scrollTop = document.getElementById("jstext").scrollHeight;
     }
 
-    setInterval(update, 2000);
+    setInterval(update, 1342);
 </script>
 
 <form action="{{ url_for('grid') }}" method="post">
@@ -39,7 +39,7 @@
     <input type="hidden" name="retrain" value="Yes"/>
     <input type="hidden" name="show_static" value="No"/>
 
-    <textarea class="scrollabletextbox" style="border:1px solid white; width:450px; height:70px; background:lightsteelblue; font-size : 16px; text-align: center;"
+    <textarea class="scrollabletextbox" style="border:1px solid grey; width:570px; height:70px; background:lightgray; font-size : 16px; text-align: center; margin-left:12px;"
          id="jstext">Training the model</textarea>
 </form>
 </body>

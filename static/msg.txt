@@ -15,7 +15,7 @@ Breaking out of the Matrix
 Massaging the Data
 Unpickling the Pickle
 Changing bits from 0 to 1
-Pulling the String
+Pulling some Strings
 Poking the Pixels
 4, 8, 15, 16, 23, 42 
 Looking through the Windows

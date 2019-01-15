@@ -20,8 +20,8 @@
 </form>
 <form action="{{ url_for('grid') }}" method="post">
     <button type="submit" {{ train_disabled }}
-            style="border:1px solid grey; width:450px; height:70px; background:lightsteelblue; font-size : 16px">Train
-        image classifier
+            style="border:1px solid grey; width:575px; height:75px; background:lightsteelblue; font-size : 16px; margin-left:12px;">Train
+        image classifier (takes ca. 15 seconds)
     </button>
     <input type="hidden" name="border_indices" value={{ border_indices }} />
     <input type="hidden" name="retrain" value="Yes"/>
