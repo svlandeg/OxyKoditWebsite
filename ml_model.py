@@ -40,11 +40,6 @@ FLAGS['random_crop'] = False
 FLAGS['random_scale'] = False
 FLAGS['random_brightness'] = False
 
-# A module is understood as instrumented for quantization with TF-Lite
-# if it contains any of these ops.
-FAKE_QUANT_OPS = ('FakeQuantWithMinMaxVars',
-                  'FakeQuantWithMinMaxVarsPerChannel')
-
 MAX_NUM_IMAGES_PER_CLASS = 2 ** 27 - 1  # ~134M
 
 
@@ -114,16 +109,13 @@ def create_module_graph(module_spec):
       graph: the tf.Graph that was created.
       bottleneck_tensor: the bottleneck values output by the module.
       resized_input_tensor: the input images, resized as expected by the module.
-      wants_quantization: a boolean, whether the module has been instrumented
-        with fake quantization ops.
     """
     height, width = hub.get_expected_image_size(module_spec)
     with tf.Graph().as_default() as graph:
         resized_input_tensor = tf.placeholder(tf.float32, [None, height, width, 3])
         m = hub.Module(module_spec)
         bottleneck_tensor = m(resized_input_tensor)
-        wants_quantization = any(node.op in FAKE_QUANT_OPS for node in graph.as_graph_def().node)
-    return graph, bottleneck_tensor, resized_input_tensor, wants_quantization
+    return graph, bottleneck_tensor, resized_input_tensor
 
 
 def add_jpeg_decoding(module_spec):
@@ -151,7 +143,7 @@ def add_jpeg_decoding(module_spec):
     return jpeg_data, resized_image
 
 
-def add_final_retrain_ops(class_count, final_tensor_name, bottleneck_tensor, quantize_layer, is_training):
+def add_final_retrain_ops(class_count, final_tensor_name, bottleneck_tensor, is_training):
     """Adds a new softmax and fully-connected layer for training and eval.
 
     We need to retrain the top layer to identify our new classes, so this function
@@ -166,8 +158,6 @@ def add_final_retrain_ops(class_count, final_tensor_name, bottleneck_tensor, qua
           recognize.
       final_tensor_name: Name string for the new final node that produces results.
       bottleneck_tensor: The output of the main CNN graph.
-      quantize_layer: Boolean, specifying whether the newly added layer should be
-          instrumented for quantization with TF-Lite.
       is_training: Boolean, specifying whether the newly add layer is for training
           or eval.
 
@@ -201,15 +191,6 @@ def add_final_retrain_ops(class_count, final_tensor_name, bottleneck_tensor, qua
             tf.summary.histogram('pre_activations', logits)
 
     final_tensor = tf.nn.softmax(logits, name=final_tensor_name)
-
-    # The tf.contrib.quantize functions rewrite the graph in place for
-    # quantization. The imported model graph has already been rewritten, so upon
-    # calling these rewrites, only the newly added final layer will be transformed.
-    if quantize_layer:
-        if is_training:
-            tf.contrib.quantize.create_training_graph()
-        else:
-            tf.contrib.quantize.create_eval_graph()
 
     tf.summary.histogram('activations', final_tensor)
 
@@ -324,20 +305,17 @@ def build_eval_graph(sess, module_spec, class_count):
     """
     eval_graph = sess.graph
 
-    # If quantized, we need to create the correct eval graph for exporting.
     height, width = hub.get_expected_image_size(module_spec)
 
     resized_input_tensor = tf.placeholder(tf.float32, [None, height, width, 3])
     m = hub.Module(module_spec)
     bottleneck_tensor = m(resized_input_tensor)
-    wants_quantization = any(node.op in FAKE_QUANT_OPS for node in eval_graph.as_graph_def().node)
 
     with eval_graph.as_default():
         # Add the new layer
         (_, _, bottleneck_input,
          ground_truth_input, final_tensor) = add_final_retrain_ops(
-            class_count, FLAGS['final_tensor_name'], bottleneck_tensor,
-            wants_quantization, is_training=False)
+            class_count, FLAGS['final_tensor_name'], bottleneck_tensor, is_training=False)
 
         add_evaluation_step(final_tensor, ground_truth_input)
 
@@ -361,14 +339,13 @@ def main(tufa_image_list, nontufa_image_list, all_image_list, model_url, img_siz
 
     # Set up the pre-trained graph.
     module_spec = hub.load_module_spec(model_url)
-    graph, bottleneck_tensor, resized_image_tensor, wants_quantization = (create_module_graph(module_spec))
+    graph, bottleneck_tensor, resized_image_tensor = (create_module_graph(module_spec))
 
     # Add the new layer that we'll be training.
     with graph.as_default():
         (train_step, cross_entropy, bottleneck_input,
          ground_truth_input, final_tensor) = add_final_retrain_ops(
-            class_count, FLAGS['final_tensor_name'], bottleneck_tensor,
-            wants_quantization, is_training=True)
+            class_count, FLAGS['final_tensor_name'], bottleneck_tensor, is_training=True)
 
     with tf.Session(graph=graph) as sess:
         # Initialize all weights: for the module to their pretrained values,
@@ -436,27 +413,27 @@ def main(tufa_image_list, nontufa_image_list, all_image_list, model_url, img_siz
     input_std = img_size
 
     pred_list = []
-    for file_name in all_image_list:
-        if file_name.lower().endswith(".jpg"):
-            t = read_tensor_from_image_file(
-                os.path.join(img_dir, file_name),
-                input_height=input_height,
-                input_width=input_width,
-                input_mean=input_mean,
-                input_std=input_std)
+    with tf.Session(graph=output_graph) as pred_sess:
+        for file_name in all_image_list:
+            if file_name.lower().endswith(".jpg"):
+                t = read_tensor_from_image_file(
+                    os.path.join(img_dir, file_name),
+                    input_height=input_height,
+                    input_width=input_width,
+                    input_mean=input_mean,
+                    input_std=input_std)
 
-            with tf.Session(graph=output_graph) as sess:
-                results = sess.run(output_operation.outputs[0], {
+                results = pred_sess.run(output_operation.outputs[0], {
                     input_operation.outputs[0]: t
                 })
-            results = np.squeeze(results)
+                results = np.squeeze(results)
 
-            top_k = results.argsort()[-5:][::-1]
+                top_k = results.argsort()[-5:][::-1]
 
-            # we only care about the tufa % prediction
-            for i in top_k:
-                if labels[i] == "tufa":
-                    pred_list.append(results[i])
+                # we only care about the tufa % prediction
+                for i in top_k:
+                    if labels[i] == "tufa":
+                        pred_list.append(results[i])
 
     return pred_list
 
